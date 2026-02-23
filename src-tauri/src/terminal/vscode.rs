@@ -91,42 +91,60 @@ fn classify_vscode_process(name: &str) -> Option<String> {
     None
 }
 
-/// Focus the VS Code (or compatible editor) window that contains this session.
-/// Tries each known editor process name in order.
-pub fn focus_vscode() -> Result<(), String> {
-    let script = r#"
-        tell application "System Events"
-            if exists process "Code" then
-                set frontmost of process "Code" to true
-                return "found"
-            end if
-            if exists process "Cursor" then
-                set frontmost of process "Cursor" to true
-                return "found"
-            end if
-            if exists process "Windsurf" then
-                set frontmost of process "Windsurf" to true
-                return "found"
-            end if
-        end tell
-        return "not found"
-    "#;
-    execute_applescript(script)
-}
+/// Focus the VS Code window for the given project.
+///
+/// Strategy:
+/// 1. Find the VS Code window whose title contains the project name and raise it.
+///    VS Code window titles are like "project-name — Visual Studio Code".
+/// 2. If no matching window is found, just bring VS Code to the foreground.
+///
+/// Note: VS Code does not expose terminal tabs via AppleScript, so we can only
+/// navigate to the correct *window*. The terminal that was last active in that
+/// window will remain visible — which is the expected behaviour for single-window
+/// single-project setups.
+pub fn focus_vscode_window(editor_name: &str, project_path: &str) -> Result<(), String> {
+    // Extract the project folder name from the path (last non-empty component).
+    let project_name = project_path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .last()
+        .unwrap_or(project_path);
 
-/// Focus a specific VS Code-compatible editor by its process name
-pub fn focus_vscode_by_name(editor_name: &str) -> Result<(), String> {
+    // Escape any double-quotes in the project name before embedding in AppleScript.
+    let safe_project = project_name.replace('"', "\\\"");
+    let safe_editor  = editor_name.replace('"', "\\\"");
+
     let script = format!(
         r#"
         tell application "System Events"
-            if exists process "{}" then
-                set frontmost of process "{}" to true
-                return "found"
+            if not (exists process "{editor}") then
+                return "not found"
             end if
+            tell process "{editor}"
+                -- Try to raise the window whose title contains the project name.
+                set matchedWindow to missing value
+                repeat with w in (every window)
+                    if name of w contains "{project}" then
+                        set matchedWindow to w
+                        exit repeat
+                    end if
+                end repeat
+                if matchedWindow is not missing value then
+                    set frontmost of process "{editor}" to true
+                    perform action "AXRaise" of matchedWindow
+                    return "found"
+                else
+                    -- No window matched: just bring the editor to the front.
+                    set frontmost of process "{editor}" to true
+                    return "focused"
+                end if
+            end tell
         end tell
         return "not found"
-    "#,
-        editor_name, editor_name
+        "#,
+        editor = safe_editor,
+        project = safe_project,
     );
+
     execute_applescript(&script)
 }

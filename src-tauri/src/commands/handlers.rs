@@ -17,7 +17,7 @@ pub fn get_all_sessions() -> SessionsResponse {
 /// Focus the terminal containing a specific session
 #[tauri::command]
 pub fn focus_session(pid: u32, project_path: String) -> Result<(), String> {
-    terminal::focus_terminal_for_pid(pid)
+    terminal::focus_terminal_for_pid(pid, &project_path)
         .or_else(|_| terminal::focus_terminal_by_path(&project_path))
 }
 

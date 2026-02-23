@@ -8,13 +8,14 @@ use applescript::execute_applescript;
 
 pub use vscode::{detect_vscode_ancestor, is_vscode_terminal};
 
-/// Focus the terminal containing the Claude process with the given PID
-pub fn focus_terminal_for_pid(pid: u32) -> Result<(), String> {
+/// Focus the terminal containing the Claude process with the given PID.
+/// `project_path` is used to identify the correct editor window when VS Code is detected.
+pub fn focus_terminal_for_pid(pid: u32, project_path: &str) -> Result<(), String> {
     // Check VS Code FIRST, before TTY lookup.
     // VS Code terminals have a TTY, but iTerm2/Terminal.app won't recognise them,
     // so we handle them separately by walking the parent-process chain.
     if let Some(editor_name) = vscode::detect_vscode_ancestor(pid) {
-        if vscode::focus_vscode_by_name(&editor_name).is_ok() {
+        if vscode::focus_vscode_window(&editor_name, project_path).is_ok() {
             return Ok(());
         }
     }
