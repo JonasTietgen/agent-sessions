@@ -113,8 +113,16 @@ pub fn determine_status(
     match last_msg_type {
         Some("assistant") => {
             if has_tool_use {
-                // Tool is executing - could take seconds or minutes
-                SessionStatus::Processing
+                if file_recently_modified {
+                    // Tool is actively executing: Claude Code writes progress entries to
+                    // the JSONL file while a tool runs, so the file is recently modified.
+                    SessionStatus::Processing
+                } else {
+                    // tool_use was requested but the file hasn't been touched for >3s.
+                    // This means the tool is NOT running yet — Claude is waiting for the
+                    // user to approve the tool call (bash approval mode, etc.).
+                    SessionStatus::Waiting
+                }
             } else if file_recently_modified {
                 // Text response but file is still being written to
                 // (streaming, compacting, or about to send tool_use)

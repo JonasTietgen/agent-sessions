@@ -53,26 +53,42 @@ fn get_process_name(pid: u32) -> Option<String> {
     }
 }
 
-/// Returns the canonical editor name if the process is a VS Code-compatible editor,
-/// None otherwise.
+/// Returns the System Events process name if this process belongs to a VS Code-compatible
+/// editor, None otherwise.
+///
+/// On macOS, `ps -o comm=` returns the full executable path, e.g.:
+///   /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper
+///   /Applications/Visual Studio Code.app/Contents/MacOS/Electron
+///
+/// The System Events process name (used in AppleScript `exists process "…"`) is the
+/// CFBundleName of the host app bundle: VS Code → "Code", Cursor → "Cursor", etc.
 fn classify_vscode_process(name: &str) -> Option<String> {
-    // Match only the main process names, not helpers/renderers.
-    // On macOS, VS Code and its forks run as "Code", "Cursor", "Windsurf", etc.
-    // "Code Helper (Renderer)" and similar are NOT the main window process.
     let trimmed = name.trim();
+
+    // Fast path: some systems return only the binary name
     match trimmed {
-        "Code" => Some("Code".to_string()),
-        "Cursor" => Some("Cursor".to_string()),
-        "Windsurf" => Some("Windsurf".to_string()),
-        _ => {
-            // "Code - Insiders" appears as a single comm string on some systems
-            if trimmed.starts_with("Code ") && !trimmed.contains("Helper") {
-                Some(trimmed.to_string())
-            } else {
-                None
-            }
-        }
+        "Code" => return Some("Code".to_string()),
+        "Cursor" => return Some("Cursor".to_string()),
+        "Windsurf" => return Some("Windsurf".to_string()),
+        _ => {}
     }
+
+    // Full-path matching — check for known .app bundle names inside the path.
+    // VS Code Insiders must be checked before plain VS Code to avoid a false match.
+    if trimmed.contains("Visual Studio Code - Insiders.app") {
+        return Some("Code - Insiders".to_string());
+    }
+    if trimmed.contains("Visual Studio Code.app") {
+        return Some("Code".to_string());
+    }
+    if trimmed.contains("/Cursor.app/") {
+        return Some("Cursor".to_string());
+    }
+    if trimmed.contains("/Windsurf.app/") {
+        return Some("Windsurf".to_string());
+    }
+
+    None
 }
 
 /// Focus the VS Code (or compatible editor) window that contains this session.
