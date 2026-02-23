@@ -325,6 +325,7 @@ fn get_latest_session_for_project(
         pid: process.pid,
         cpu_usage: process.cpu_usage,
         active_subagent_count: 0,
+        terminal_type: crate::session::TerminalType::Other,
     })
 }
 
@@ -512,5 +513,6 @@ fn get_global_session_for_directory(
         pid: process.pid,
         cpu_usage: process.cpu_usage,
         active_subagent_count: 0,
+        terminal_type: crate::session::TerminalType::Other,
     })
 }
