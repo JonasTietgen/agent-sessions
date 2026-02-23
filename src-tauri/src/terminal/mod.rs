@@ -2,20 +2,32 @@ mod applescript;
 mod iterm;
 mod terminal_app;
 mod tmux;
+pub mod vscode;
 
 use applescript::execute_applescript;
 
+pub use vscode::{detect_vscode_ancestor, is_vscode_terminal};
+
 /// Focus the terminal containing the Claude process with the given PID
 pub fn focus_terminal_for_pid(pid: u32) -> Result<(), String> {
-    // First, get the TTY for this process
+    // Check VS Code FIRST, before TTY lookup.
+    // VS Code terminals have a TTY, but iTerm2/Terminal.app won't recognise them,
+    // so we handle them separately by walking the parent-process chain.
+    if let Some(editor_name) = vscode::detect_vscode_ancestor(pid) {
+        if vscode::focus_vscode_by_name(&editor_name).is_ok() {
+            return Ok(());
+        }
+    }
+
+    // Get the TTY for this process
     let tty = get_tty_for_pid(pid)?;
 
-    // Try tmux first (if the process is running inside tmux)
+    // Try tmux next (if the process is running inside tmux)
     if tmux::focus_tmux_pane_by_tty(&tty).is_ok() {
         return Ok(());
     }
 
-    // Try iTerm2 next
+    // Try iTerm2
     if iterm::focus_iterm_by_tty(&tty).is_ok() {
         return Ok(());
     }

@@ -2,6 +2,9 @@ export type SessionStatus = 'waiting' | 'processing' | 'thinking' | 'compacting'
 
 export type AgentType = 'claude' | 'opencode';
 
+/** Terminal environment the session is running in */
+export type TerminalType = 'vscode' | 'cursor' | 'windsurf' | 'other';
+
 export interface Session {
   id: string;
   agentType: AgentType;
@@ -16,6 +19,8 @@ export interface Session {
   pid: number;
   cpuUsage: number;
   activeSubagentCount: number;
+  /** Terminal environment where this session is running */
+  terminalType: TerminalType;
 }
 
 export interface SessionsResponse {

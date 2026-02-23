@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Session } from '../types/session';
+import { Session, TerminalType } from '../types/session';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,59 @@ const OpenCodeIcon = ({ className }: { className?: string }) => (
     <path d="M18 6H6V24H18V6ZM24 30H0V0H24V30Z"/>
   </svg>
 );
+
+// VS Code icon (official "< >" mark)
+const VscodeIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className || "w-3.5 h-3.5"}>
+    <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 19.88V4.12a1.5 1.5 0 0 0-.85-1.533zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/>
+  </svg>
+);
+
+// Cursor icon (simplified "C" shape)
+const CursorIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className || "w-3.5 h-3.5"}>
+    <path d="M4 2l16 10-16 10V2z"/>
+  </svg>
+);
+
+/** Badge showing which terminal environment the session is running in.
+ *  Only rendered for VS Code and compatible editors — hidden for 'other'. */
+const TerminalBadge = ({ terminalType }: { terminalType: TerminalType }) => {
+  if (terminalType === 'vscode') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-500 opacity-70"
+        title="Running in VS Code terminal"
+      >
+        <VscodeIcon className="w-3 h-3 fill-blue-500" />
+        <span>VS Code</span>
+      </span>
+    );
+  }
+  if (terminalType === 'cursor') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 text-[10px] font-medium text-purple-500 opacity-70"
+        title="Running in Cursor terminal"
+      >
+        <CursorIcon className="w-3 h-3 fill-purple-500" />
+        <span>Cursor</span>
+      </span>
+    );
+  }
+  if (terminalType === 'windsurf') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 text-[10px] font-medium text-teal-500 opacity-70"
+        title="Running in Windsurf terminal"
+      >
+        <span className="text-[10px]">⛵</span>
+        <span>Windsurf</span>
+      </span>
+    );
+  }
+  return null;
+};
 
 // Agent icon - Claude always orange (brand color), OpenCode uses status color
 const AgentStatusIcon = ({ type, statusColor }: { type: 'claude' | 'opencode', statusColor: string }) => {
@@ -192,9 +245,12 @@ export function SessionCard({ session, onClick }: SessionCardProps) {
               <h3 className="font-semibold text-base text-foreground truncate group-hover:text-primary transition-colors">
                 {displayName}
               </h3>
-              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {truncatePath(session.projectPath)}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs text-muted-foreground truncate">
+                  {truncatePath(session.projectPath)}
+                </p>
+                <TerminalBadge terminalType={session.terminalType} />
+              </div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {/* URL Button - visible on hover if URL is set */}

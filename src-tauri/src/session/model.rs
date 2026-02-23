@@ -8,6 +8,21 @@ pub enum AgentType {
     OpenCode,
 }
 
+/// Terminal environment the agent session is running in
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TerminalType {
+    /// VS Code integrated terminal (also matches Cursor, Windsurf, and other VS Code forks)
+    Vscode,
+    /// Cursor editor integrated terminal
+    Cursor,
+    /// Windsurf editor integrated terminal
+    Windsurf,
+    /// Any other terminal (iTerm2, Terminal.app, tmux, etc.)
+    #[default]
+    Other,
+}
+
 /// Represents a Claude Code session
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +40,8 @@ pub struct Session {
     pub pid: u32,
     pub cpu_usage: f32,
     pub active_subagent_count: usize,
+    /// Terminal environment where this session is running
+    pub terminal_type: TerminalType,
 }
 
 /// Status of a Claude Code session

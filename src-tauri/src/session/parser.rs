@@ -8,7 +8,8 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
 use crate::agent::AgentProcess;
-use super::model::{AgentType, Session, SessionStatus, SessionsResponse, JsonlMessage};
+use crate::terminal::{detect_vscode_ancestor};
+use super::model::{AgentType, Session, SessionStatus, SessionsResponse, TerminalType, JsonlMessage};
 use super::status::{determine_status, has_tool_use, has_tool_result, is_local_slash_command, is_interrupted_request, status_sort_priority};
 
 /// Track previous status for each session to detect transitions
@@ -418,8 +419,17 @@ fn find_session_for_process(
     // Get the primary JSONL file at the given index
     let primary_jsonl = jsonl_files.get(index)?;
 
+    // Detect terminal type once per process (walks parent chain via ps)
+    let terminal_type = match detect_vscode_ancestor(process.pid) {
+        Some(ref name) if name == "Code" || name.starts_with("Code ") => TerminalType::Vscode,
+        Some(ref name) if name == "Cursor" => TerminalType::Cursor,
+        Some(ref name) if name == "Windsurf" => TerminalType::Windsurf,
+        _ => TerminalType::Other,
+    };
+
     // Parse the primary file first
     let mut session = parse_session_file(primary_jsonl, project_path, process.pid, process.cpu_usage, agent_type.clone())?;
+    session.terminal_type = terminal_type;
 
     // Count active subagents for this session
     session.active_subagent_count = count_active_subagents(project_dir, &session.id);
@@ -669,5 +679,6 @@ pub fn parse_session_file(
         pid,
         cpu_usage,
         active_subagent_count: 0, // Set by find_session_for_process
+        terminal_type: TerminalType::Other, // Set by find_session_for_process
     })
 }
