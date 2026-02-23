@@ -15,7 +15,7 @@ pub fn focus_terminal_for_pid(pid: u32, project_path: &str) -> Result<(), String
     // VS Code terminals have a TTY, but iTerm2/Terminal.app won't recognise them,
     // so we handle them separately by walking the parent-process chain.
     if let Some(editor_name) = vscode::detect_vscode_ancestor(pid) {
-        if vscode::focus_vscode_window(&editor_name, project_path).is_ok() {
+        if vscode::focus_vscode_window(pid, &editor_name, project_path).is_ok() {
             return Ok(());
         }
     }

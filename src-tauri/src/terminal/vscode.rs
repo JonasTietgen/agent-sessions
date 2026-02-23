@@ -1,4 +1,6 @@
 use super::applescript::execute_applescript;
+use std::io::Write as IoWrite;
+use std::net::TcpStream;
 use std::process::Command;
 
 /// Check if the process with the given PID is running inside VS Code's integrated terminal
@@ -91,18 +93,54 @@ fn classify_vscode_process(name: &str) -> Option<String> {
     None
 }
 
+/// Send a focus request to the VS Code Extension via HTTP POST to localhost:7331.
+/// Returns Ok(()) if the extension acknowledged the request (HTTP 200).
+fn try_extension_focus(pid: u32) -> Result<(), String> {
+    let body = format!("{{\"pid\":{}}}", pid);
+    let content_length = body.len();
+    let request = format!(
+        "POST /focus HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+        content_length, body
+    );
+
+    let mut stream = TcpStream::connect("127.0.0.1:7331")
+        .map_err(|e| format!("Extension not available: {}", e))?;
+
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|e| format!("Failed to send request: {}", e))?;
+
+    // Read just enough to check the status line
+    let mut response = [0u8; 15];
+    use std::io::Read;
+    stream
+        .read(&mut response)
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    let status_line = String::from_utf8_lossy(&response);
+    if status_line.starts_with("HTTP/1.") && status_line.contains("200") {
+        Ok(())
+    } else {
+        Err(format!("Extension returned non-200: {}", status_line.trim()))
+    }
+}
+
 /// Focus the VS Code window for the given project.
 ///
 /// Strategy:
-/// 1. Find the VS Code window whose title contains the project name and raise it.
-///    VS Code window titles are like "project-name — Visual Studio Code".
-/// 2. If no matching window is found, just bring VS Code to the foreground.
-///
-/// Note: VS Code does not expose terminal tabs via AppleScript, so we can only
-/// navigate to the correct *window*. The terminal that was last active in that
-/// window will remain visible — which is the expected behaviour for single-window
-/// single-project setups.
-pub fn focus_vscode_window(editor_name: &str, project_path: &str) -> Result<(), String> {
+/// 1. Try the Agent Sessions VS Code Extension (port 7331) for precise terminal-tab navigation.
+/// 2. Regardless, bring the correct editor window to the foreground via AppleScript.
+/// 3. If the extension is not running, fall back to AppleScript-only (previous behaviour).
+pub fn focus_vscode_window(pid: u32, editor_name: &str, project_path: &str) -> Result<(), String> {
+    if try_extension_focus(pid).is_ok() {
+        // Extension found the terminal — still raise the window so it appears in front.
+        return focus_window_applescript(editor_name, project_path);
+    }
+    // Extension not available: fall back to window-only focus (previous behaviour).
+    focus_window_applescript(editor_name, project_path)
+}
+
+fn focus_window_applescript(editor_name: &str, project_path: &str) -> Result<(), String> {
     // Extract the project folder name from the path (last non-empty component).
     let project_name = project_path
         .split('/')
