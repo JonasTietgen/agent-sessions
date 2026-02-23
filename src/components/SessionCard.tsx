@@ -147,7 +147,22 @@ function setCustomUrl(sessionId: string, url: string) {
 }
 
 export function SessionCard({ session, onClick }: SessionCardProps) {
-  const config = statusConfig[session.status];
+  const baseConfig = statusConfig[session.status];
+
+  // When the main session is "waiting" but sub-agents are active, override the
+  // display so it doesn't misleadingly show "Waiting for input".
+  const config = (session.status === 'waiting' && session.activeSubagentCount > 0)
+    ? {
+        color: 'bg-blue-400',
+        fillColor: 'fill-blue-400',
+        cardBg: 'bg-blue-400/15',
+        cardBorder: 'border-blue-400/30',
+        badgeClassName: 'border-blue-400/40 text-blue-300 bg-blue-400/20',
+        label: session.activeSubagentCount === 1
+          ? '1 Agent running'
+          : `${session.activeSubagentCount} Agents running`,
+      }
+    : baseConfig;
   const [customName, setCustomNameState] = useState<string>('');
   const [customUrl, setCustomUrlState] = useState<string>('');
   const [isRenameOpen, setIsRenameOpen] = useState(false);
@@ -388,7 +403,7 @@ export function SessionCard({ session, onClick }: SessionCardProps) {
               <Badge variant="outline" className={config.badgeClassName}>
                 {config.label}
               </Badge>
-              {session.activeSubagentCount > 0 && (
+              {session.activeSubagentCount > 0 && session.status !== 'waiting' && (
                 <span className="text-xs text-muted-foreground">
                   [+{session.activeSubagentCount}]
                 </span>
